@@ -1,15 +1,47 @@
 #include "vehicle.hpp"
-#include <cstdlib>
-#include <iostream>
-#include <ostream>
 
 
  /*<-------vehicle implementation------>*/
 
+vehicle::vehicle() : car_status(CAR_OK){
+    Logger::getInstance()->logInfo("Car STARTED");
+}
+
+
+void vehicle::stopCar(){
+    if(car_status == LOW_FUEL){
+        std::cout << "Stopping car to put fuel" << std::endl;
+        while(fuel<=100){
+            std::cout << "Current fuel level: " << fuel << std::endl;
+            fuel++;
+        }
+
+        
+    }
+    else if(car_status == LOW_BATTERY){
+        std::cout << "Stopping car to recharge battery" << std::endl;
+        while(batt<=90){
+            std::cout << "Current fuel level: " << batt << std::endl;
+            batt++;
+        }
+    }
+    else if(car_status == HIGH_ENGINE_TEMP){
+        std::cout << "Stopping car to cooldown" << std::endl;
+        while(temp>45){
+            std::cout << "Cooling, engine temp: " << temp << std::endl;
+            temp--;
+        }
+    }
+    
+}
 
 void vehicle::moveCar(){
-    if(diag::checkSYS(&temp, &fuel, &batt)){
+    car_status = diag::checkSYS(&temp, &fuel, &batt);
+    if(!car_status){
         ECU::AdaptiveCruiseControl();
+    }
+    else{
+        vehicle::stopCar();
     }
 }
 
@@ -63,25 +95,26 @@ int v_sensors::readFuel(){
 
 diag::diag() : sys_flag(1){}
 
-bool diag::checkSYS(int *temp, int *fuel, int *battery){
+int diag::checkSYS(int *temp, int *fuel, int *battery){
+    
     if(*temp <= 45){
         if(*fuel >= 60){
             if(*battery >= 60){
-                    return true;
+                    return 0;
             }
             else{
                 std::cout << "Diagnostics Layer Failure, Check BATTERY LEVEL (LOW LEVEL).." << std::endl;
-                return false;
+                return 3;
             }
         }
         else{
             std::cout << "Diagnostics Layer Failure, Check FUEL LEVEL (LOW LEVEL).." << std::endl;
-            return false;
+            return 2;
         }
     }
     else{
         std::cout << "Diagnostics Layer Failure, Check ENGINE TEMPERATURE.." << std::endl;
-        return false;
+        return 1;
     }
     
 }
@@ -150,3 +183,45 @@ void ECU::AdaptiveCruiseControl(){
 }
 
  /*<-------ECU implementation------>*/
+
+
+/*<-------------------Logger implementation--------------->*/
+std::shared_ptr<Logger> Logger::instance = nullptr;
+
+// Private constructor
+Logger::Logger() {
+    logFile.open("log.txt", std::ios::out | std::ios::app);
+    if (!logFile) {
+        throw std::runtime_error("Unable to open log file.");
+    }
+}
+
+// Destructor
+Logger::~Logger() {
+    if (logFile.is_open()) {
+        logFile.close();
+    }
+}
+
+// Static method to get the single instance
+std::shared_ptr<Logger> Logger::getInstance() {
+    if (instance == nullptr) {
+        instance = std::shared_ptr<Logger>(new Logger());
+    }
+    return instance;
+}
+
+// Logging methods
+void Logger::logInfo(const std::string& message) {
+    logFile << "[INFO]: " << message << std::endl;
+}
+
+void Logger::logError(const std::string& message) {
+    logFile << "[ERROR]: " << message << std::endl;
+}
+
+void Logger::logDebug(const std::string& message) {
+    logFile << "[DEBUG]: " << message << std::endl;
+}
+
+/*<------------------------Logger implementation----------->*/
